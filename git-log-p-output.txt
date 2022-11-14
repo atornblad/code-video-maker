@@ -1,0 +1,144 @@
+commit 78c37e09ad55482c49878ece882072c57e2efae5
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Mon Nov 14 13:45:44 2022 +0100
+
+    Added index.html
+
+diff --git a/index.html b/index.html
+new file mode 100644
+index 0000000..fa17478
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,8 @@
++<html>
++<head>
++    <title>JS Mod Player by Anders Marzi Tornblad</title>
++</head>
++<body>
++    <script src="player.js"></script>
++</body>
++</html>
+
+commit 9281cd7d18e65aa655cf6234af1f4c8b4bace101
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Mon Nov 14 14:31:12 2022 +0100
+
+    First version of the player.js
+
+diff --git a/player.js b/player.js
+new file mode 100644
+index 0000000..0e4cf73
+--- /dev/null
++++ b/player.js
+@@ -0,0 +1,16 @@
++// Create the audio context
++const audio = new AudioContext();
++
++// Load an audio worklet
++await audio.audioWorklet.addModule('./player-worklet.js');
++
++// Create a player
++const player = new AudioWorkletNode(audio, 'player-worklet');
++
++// Connect the player to the audio context
++player.connect(audio.destination);
++
++// Play something
++player.port.postMessage({
++    type: 'play'
++});
+
+commit 1f95dbbc5504ff272b0a40254c4e86b27f219ffa
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Mon Nov 14 14:59:28 2022 +0100
+
+    Playing a sine wave
+
+diff --git a/player-worklet.js b/player-worklet.js
+new file mode 100644
+index 0000000..544423c
+--- /dev/null
++++ b/player-worklet.js
+@@ -0,0 +1,37 @@
++// The PlayerWorklet class
++class PlayerWorklet extends AudioWorkletProcessor {
++    constructor(options) {
++        super(options);
++        this.port.onmessage = this.onmessage.bind(this);
++        this.playing = false;
++    }
++
++    onmessage(e) {
++        if (e.data.type === 'play') {
++            this.playing = !this.playing;
++            this.phase = 0;
++        }
++    }
++
++    process(inputs, outputs) {
++        const output = outputs[0];
++        const channel = output[0];
++
++        if (!this.playing) {
++            // Silence
++            for (let i = 0; i < channel.length; ++i) {
++                channel[i] = 0.0;
++            }
++            return true;
++        }
++
++        // Generate a sine wave
++        for (let i = 0; i < channel.length; ++i) {
++            channel[i] = Math.sin(this.phase);
++            this.phase += 0.1;
++        }
++        return true;
++    }
++}
++
++registerProcessor('player-worklet', PlayerWorklet);
+
+commit d2b9514045ef1a562c63fade31da5170495d0a9f
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Mon Nov 14 14:59:46 2022 +0100
+
+    Top-level async only supported in module JS
+
+diff --git a/index.html b/index.html
+index fa17478..b39bbe8 100644
+--- a/index.html
++++ b/index.html
+@@ -3,6 +3,6 @@
+     <title>JS Mod Player by Anders Marzi Tornblad</title>
+ </head>
+ <body>
+-    <script src="player.js"></script>
++    <script src="player.js" type="module"></script>
+ </body>
+ </html>
+
+commit 65ec70cc4428ea63c8daf436ec411ea793e4ae7b
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Mon Nov 14 15:00:26 2022 +0100
+
+    Play sound on click
+
+diff --git a/player.js b/player.js
+index 0e4cf73..1f77697 100644
+--- a/player.js
++++ b/player.js
+@@ -10,7 +10,10 @@ const player = new AudioWorkletNode(audio, 'player-worklet');
+ // Connect the player to the audio context
+ player.connect(audio.destination);
+ 
+-// Play something
+-player.port.postMessage({
+-    type: 'play'
+-});
++// Play something when the user clicks the window
++window.onclick = () => {
++    audio.resume();
++    player.port.postMessage({
++        type: 'play'
++    });
++};
