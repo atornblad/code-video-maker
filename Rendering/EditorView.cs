@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Text.RegularExpressions;
 
@@ -17,6 +18,8 @@ class EditorView
     private string filename;
     private Highlighting.Highlighter highlighter;
     private Dictionary<char, Brush> brushes = new Dictionary<char, Brush>();
+
+    public int CurrentLine => currentLine;
 
     public EditorView(Graphics graphics, Bitmap bitmap, string filename, IEnumerable<string> initialLines)
     {
@@ -46,7 +49,7 @@ class EditorView
         if (!brushes.ContainsKey(style))
         {
             var color = Color.FromArgb(random.Next(156) + 100, random.Next(156) + 100, random.Next(100) + 156);
-            Console.WriteLine($"Creating brush for style {style}: {color}");
+            Debug.WriteLine($"Creating brush for style {style}: {color}");
             brushes[style] = new SolidBrush(color);
         }
         return brushes[style];
@@ -158,7 +161,7 @@ class EditorView
 
     public void AddLine(int line, string text, Action<Bitmap> output)
     {
-        Console.WriteLine($"Adding line {line} with text {text}");
+        Debug.WriteLine($"Adding line {line} with text {text}");
         string indentation = GetIndentation(text);
         lines.Insert(line, indentation);
         colors.Insert(line, indentation);
@@ -169,12 +172,12 @@ class EditorView
         {
             AddChar(text[len], output);
         }
-        System.Console.WriteLine($"Line {line} is colored       {colors[line]}");
+        Debug.WriteLine($"Line {line} is colored       {colors[line]}");
     }
 
     public void DeleteLine(int line, Action<Bitmap> output)
     {
-        Console.WriteLine($"Deleting line {line} with text {lines[line]}");
+        Debug.WriteLine($"Deleting line {line} with text {lines[line]}");
         MoveCursorTo(line, 0, output);
         lines.RemoveAt(line);
         colors.RemoveAt(line);
@@ -231,10 +234,16 @@ class EditorView
     public void ScrollIntoView(int lineNumber, Action<Bitmap> output)
     {
         // TODO: Add support for different speeds
-        int targetTopLine = lineNumber - (rowsPerScreen / 3);
-        if (targetTopLine > lines.Count - rowsPerScreen + 8) targetTopLine = lines.Count - rowsPerScreen + 8;
-        if (targetTopLine < 0) targetTopLine = 0;
-        if (Math.Abs(targetTopLine - topLine) < 4) return;
+        int safeTop = topLine + 2;
+        int safeBottom = topLine + rowsPerScreen - 4;
+
+        int targetTopLine = topLine;
+        if (lineNumber < safeTop) {
+            targetTopLine = Math.Max(0, lineNumber - 2);
+        }
+        if (lineNumber > safeBottom) {
+            targetTopLine = Math.Min(lines.Count - rowsPerScreen + 4, lineNumber - rowsPerScreen + 4);
+        }
 
         while (topLine != targetTopLine)
         {

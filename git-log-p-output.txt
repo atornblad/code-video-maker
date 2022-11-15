@@ -142,3 +142,362 @@ index 0e4cf73..1f77697 100644
 +        type: 'play'
 +    });
 +};
+
+commit 240b77c88f57fb83998ef92d647fe43852ea39f1
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 11:42:47 2022 +0100
+
+    Started on the loadMod function
+
+diff --git a/loader.js b/loader.js
+new file mode 100644
+index 0000000..53ff1e9
+--- /dev/null
++++ b/loader.js
+@@ -0,0 +1,7 @@
++// Load MOD file
++export const loadMod = async (url) => {
++    const response = await fetch(url);
++    const arrayBuffer = await response.arrayBuffer();
++    const mod = new Mod(arrayBuffer);
++    return mod;
++};
+
+commit 35cf273edff987578f0af1bcd7bdcdbee063b1e3
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 12:08:18 2022 +0100
+
+    Started on Mod class, just file format info comments
+
+diff --git a/loader.js b/loader.js
+index 53ff1e9..df6a7f5 100644
+--- a/loader.js
++++ b/loader.js
+@@ -1,3 +1,31 @@
++class Mod
++{
++    constructor(bytes) {
++        // Source: http://lclevy.free.fr/mo3/mod.txt
++        // First 20 bytes are the name of the song
++        // 
++        // Instrument data starts at byte 20
++        // There are 31 instruments with this structure
++        //     0..21: Instrument name
++        //    22..23: Half of sample length
++        //        24: Finetune
++        //        25: Volume
++        //    26..27: Half of loop start
++        //    28..29: Half of loop length
++        // 
++        // Song data starts at byte 950
++        //  950: Song length
++        //  951: Restart position
++        //  952: Pattern table (128 bytes)
++        // 1080: Magic string "M.K."
++        // 1084: Pattern data
++        //       Each pattern is 1024 bytes
++        //       Number of patterns stored depends on the
++        //       highest value in the pattern table
++        // ????: Sample data
++    }
++}
++
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+
+commit 9414c372f05bf314bc4ef55778a19acb4aae970a
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 12:12:54 2022 +0100
+
+    Call initInstrument in a loop
+
+diff --git a/loader.js b/loader.js
+index df6a7f5..2e8dfc5 100644
+--- a/loader.js
++++ b/loader.js
+@@ -13,6 +13,11 @@ class Mod
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
++        // First just get the raw data for each instrument
++        this.instruments = [];
++        for (let i = 0; i < 31; ++i) {
++            this.instruments[i] = initInstrument(bytes, 20 + i * 30);
++        }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+
+commit 5f5bf65d774a28d7e50a7ecc79885a2df32e5229
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:04:12 2022 +0100
+
+    Added initInstrument
+
+diff --git a/loader.js b/loader.js
+index 2e8dfc5..2200169 100644
+--- a/loader.js
++++ b/loader.js
+@@ -1,3 +1,15 @@
++
++const initInstrument = (bytes, start) => {
++    return {
++        length: 2 * (bytes[start + 22] * 256 + bytes[start + 23]),
++        finetune: bytes[start + 24],
++        volume: bytes[start + 25],
++        loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
++        loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
++        bytes: null
++    };
++};
++
+ class Mod
+ {
+     constructor(bytes) {
+
+commit f6c0657c20bfd6c5aa3186eb928469c47a245a0e
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:04:30 2022 +0100
+
+    Loading Phenomena Enigma tune
+
+diff --git a/player.js b/player.js
+index 1f77697..0f35ee5 100644
+--- a/player.js
++++ b/player.js
+@@ -1,3 +1,5 @@
++import { loadMod } from './loader.js';
++
+ // Create the audio context
+ const audio = new AudioContext();
+ 
+@@ -10,6 +12,11 @@ const player = new AudioWorkletNode(audio, 'player-worklet');
+ // Connect the player to the audio context
+ player.connect(audio.destination);
+ 
++// Load song from Enigma by Phenomena
++// Made by Firefox (Jimmy Fredriksson) and Tip (Robert Ling)
++const url = 'https://api.modarchive.org/downloads.php?moduleid=101789';
++const mod = await loadMod(url);
++
+ // Play something when the user clicks the window
+ window.onclick = () => {
+     audio.resume();
+
+commit 483a63f19027d2cfd926ef7787c3c67aff512f00
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:09:03 2022 +0100
+
+    initInstrument Uint8Array part 1
+
+diff --git a/loader.js b/loader.js
+index 2200169..e2041bf 100644
+--- a/loader.js
++++ b/loader.js
+@@ -28,6 +28,7 @@ class Mod
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
++            const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(bytes, 20 + i * 30);
+         }
+         // Song data starts at byte 950
+
+commit adeb33628722472b6a4b4f3e68308a68f0a58cb6
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:09:40 2022 +0100
+
+    initInstrument Uint8Array part 2
+
+diff --git a/loader.js b/loader.js
+index e2041bf..2eebe10 100644
+--- a/loader.js
++++ b/loader.js
+@@ -29,7 +29,7 @@ class Mod
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+-            this.instruments[i] = initInstrument(bytes, 20 + i * 30);
++            this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+
+commit 6b31da6255c5af089f3fa8e035e0d90f1ce2982d
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:09:53 2022 +0100
+
+    initInstrument Uint8Array part 3
+
+diff --git a/loader.js b/loader.js
+index 2eebe10..2ae90ba 100644
+--- a/loader.js
++++ b/loader.js
+@@ -1,5 +1,5 @@
+ 
+-const initInstrument = (bytes, start) => {
++const initInstrument = (bytes) => {
+     return {
+         length: 2 * (bytes[start + 22] * 256 + bytes[start + 23]),
+         finetune: bytes[start + 24],
+
+commit 351e22fcebc141bdf174e2ba15bf82b4d0f33695
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:12:26 2022 +0100
+
+    initInstrument Uint8Array part 4
+
+diff --git a/loader.js b/loader.js
+index 2ae90ba..4cad9d9 100644
+--- a/loader.js
++++ b/loader.js
+@@ -1,7 +1,7 @@
+ 
+ const initInstrument = (bytes) => {
+     return {
+-        length: 2 * (bytes[start + 22] * 256 + bytes[start + 23]),
++        length: 2 * (bytes[22] * 256 + bytes[start + 23]),
+         finetune: bytes[start + 24],
+         volume: bytes[start + 25],
+         loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+
+commit fc2d961ed064eb9aadeea7a5e3c081d2149142d8
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:12:35 2022 +0100
+
+    initInstrument Uint8Array part 5
+
+diff --git a/loader.js b/loader.js
+index 4cad9d9..f77783c 100644
+--- a/loader.js
++++ b/loader.js
+@@ -1,7 +1,7 @@
+ 
+ const initInstrument = (bytes) => {
+     return {
+-        length: 2 * (bytes[22] * 256 + bytes[start + 23]),
++        length: 2 * (bytes[22] * 256 + bytes[23]),
+         finetune: bytes[start + 24],
+         volume: bytes[start + 25],
+         loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+
+commit 7bf16a518c33b6cabaa2e29d7cceae2c5f83abf7
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:12:43 2022 +0100
+
+    initInstrument Uint8Array part 6
+
+diff --git a/loader.js b/loader.js
+index f77783c..748988c 100644
+--- a/loader.js
++++ b/loader.js
+@@ -2,7 +2,7 @@
+ const initInstrument = (bytes) => {
+     return {
+         length: 2 * (bytes[22] * 256 + bytes[23]),
+-        finetune: bytes[start + 24],
++        finetune: bytes[24],
+         volume: bytes[start + 25],
+         loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+
+commit 63e2c757535fcbc7bf897ec61d879162738ad132
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:12:52 2022 +0100
+
+    initInstrument Uint8Array part 7
+
+diff --git a/loader.js b/loader.js
+index 748988c..c9e5a7d 100644
+--- a/loader.js
++++ b/loader.js
+@@ -3,7 +3,7 @@ const initInstrument = (bytes) => {
+     return {
+         length: 2 * (bytes[22] * 256 + bytes[23]),
+         finetune: bytes[24],
+-        volume: bytes[start + 25],
++        volume: bytes[25],
+         loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+
+commit e73910d0afe29ae13d5d7b041f0baf573c2c30f7
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:13:01 2022 +0100
+
+    initInstrument Uint8Array part 8
+
+diff --git a/loader.js b/loader.js
+index c9e5a7d..6eef484 100644
+--- a/loader.js
++++ b/loader.js
+@@ -4,7 +4,7 @@ const initInstrument = (bytes) => {
+         length: 2 * (bytes[22] * 256 + bytes[23]),
+         finetune: bytes[24],
+         volume: bytes[25],
+-        loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
++        loopStart: 2 * (bytes[26] * 256 + bytes[start + 27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+
+commit 450095aeeb99d64beb75cde61245e0d174bb7001
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:13:09 2022 +0100
+
+    initInstrument Uint8Array part 9
+
+diff --git a/loader.js b/loader.js
+index 6eef484..1f1669b 100644
+--- a/loader.js
++++ b/loader.js
+@@ -4,7 +4,7 @@ const initInstrument = (bytes) => {
+         length: 2 * (bytes[22] * 256 + bytes[23]),
+         finetune: bytes[24],
+         volume: bytes[25],
+-        loopStart: 2 * (bytes[26] * 256 + bytes[start + 27]),
++        loopStart: 2 * (bytes[26] * 256 + bytes[27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+
+commit 5e78e94895dfc40cec859e11d1ab3c6a2736f813
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:13:18 2022 +0100
+
+    initInstrument Uint8Array part 10
+
+diff --git a/loader.js b/loader.js
+index 1f1669b..04ef2fa 100644
+--- a/loader.js
++++ b/loader.js
+@@ -5,7 +5,7 @@ const initInstrument = (bytes) => {
+         finetune: bytes[24],
+         volume: bytes[25],
+         loopStart: 2 * (bytes[26] * 256 + bytes[27]),
+-        loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
++        loopLength: 2 * (bytes[28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+ };
+
+commit e7581a0606997b10f74e13a74dca47247753f853
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:13:26 2022 +0100
+
+    initInstrument Uint8Array part 11
+
+diff --git a/loader.js b/loader.js
+index 04ef2fa..f165942 100644
+--- a/loader.js
++++ b/loader.js
+@@ -5,7 +5,7 @@ const initInstrument = (bytes) => {
+         finetune: bytes[24],
+         volume: bytes[25],
+         loopStart: 2 * (bytes[26] * 256 + bytes[27]),
+-        loopLength: 2 * (bytes[28] * 256 + bytes[start + 29]),
++        loopLength: 2 * (bytes[28] * 256 + bytes[29]),
+         bytes: null
+     };
+ };

@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System.Diagnostics;
+using System.Drawing;
 using CodeVideoMaker.Model;
 using CodeVideoMaker.Output;
 using CodeVideoMaker.Rendering;
@@ -107,11 +108,11 @@ public static class Program
                 string nextFilename = fileCommit.File!.Filename;
                 if (coders.TryGetValue(nextFilename, out var coder))
                 {
-                    Console.WriteLine($"Found coder for file {nextFilename}");
+                    Debug.WriteLine($"Found coder for file {nextFilename}");
                 }
                 else
                 {
-                    Console.WriteLine($"Creating new coder for file {nextFilename}");
+                    Debug.WriteLine($"Creating new coder for file {nextFilename}");
                     coder = new Coder(width, editorHeight, fps, nextFilename, Array.Empty<string>());
                     coders.Add(nextFilename, coder);
                 }
