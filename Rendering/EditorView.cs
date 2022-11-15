@@ -9,11 +9,14 @@ class EditorView
     private readonly Bitmap bitmap;
 
     private List<string> lines = new List<string>();
+    private List<string> colors = new List<string>();
     private int topLine = 0;
     private int currentLine = 0;
     private int currentColumn = 0;
     private int rowsPerScreen = 24;
     private string filename;
+    private Highlighting.Highlighter highlighter;
+    private Dictionary<char, Brush> brushes = new Dictionary<char, Brush>();
 
     public EditorView(Graphics graphics, Bitmap bitmap, string filename, IEnumerable<string> initialLines)
     {
@@ -21,6 +24,32 @@ class EditorView
         this.bitmap = bitmap;
         this.filename = filename;
         this.lines.AddRange(initialLines);
+        highlighter = Highlighting.Highlighter.For(filename);
+        brushes['c'] = new SolidBrush(Color.FromArgb(118, 152,  92));
+        brushes['i'] = new SolidBrush(Color.FromArgb(121, 191, 250));
+        brushes['k'] = new SolidBrush(Color.FromArgb(185, 137, 189));
+        brushes['r'] = new SolidBrush(Color.FromArgb(109, 119, 230));
+        //brushes['r'] = new SolidBrush(Color.FromArgb(122, 198, 177));
+        brushes['r'] = new SolidBrush(Color.FromArgb(220, 220, 175));
+        brushes['o'] = new SolidBrush(Color.FromArgb(246, 216,  71));
+        brushes['s'] = new SolidBrush(Color.FromArgb(194, 147, 124));
+        brushes['n'] = new SolidBrush(Color.FromArgb(187, 205, 171));
+        brushes[' '] = new SolidBrush(Color.FromArgb(212, 212, 212));
+    }
+
+    private static readonly Random random = new Random();
+
+    private Brush GetBrush(int line, int col)
+    {
+        string colorForLine = line < colors.Count ? colors[line] : "";
+        char style = col < colorForLine.Length ? colorForLine[col] : ' ';
+        if (!brushes.ContainsKey(style))
+        {
+            var color = Color.FromArgb(random.Next(156) + 100, random.Next(156) + 100, random.Next(100) + 156);
+            Console.WriteLine($"Creating brush for style {style}: {color}");
+            brushes[style] = new SolidBrush(color);
+        }
+        return brushes[style];
     }
 
     public void RenderFrame(bool showCursor = true)
@@ -51,7 +80,12 @@ class EditorView
             graphics.FillRectangle(black, 0, (float)codeTop, (float)totalWidth, (float)totalHeight);
         }
         //graphics.Clear(Color.Black);    // TODO: Make this configurable
-        using var font = new Font("Consolas", (float)lineHeight * 0.7f);
+        using var font = new Font("Consolas", (float)lineHeight * 0.65f);
+        var format = new StringFormat(StringFormatFlags.FitBlackBox)
+        {
+            LineAlignment = StringAlignment.Center,
+            Alignment = StringAlignment.Center
+        };
         
         int row = topLine;
         double y = codeTop;
@@ -63,14 +97,16 @@ class EditorView
             int col = 0;
             foreach (char c in line)
             {
+                var point = new PointF((float)(x + charWidth / 2), (float)(y + lineHeight / 2));
                 if (row == currentLine && col == currentColumn && showCursor)
                 {
                     graphics.FillRectangle(Brushes.White, (float)x, (float)y, (float)charWidth, (float)lineHeight);
-                    graphics.DrawString(c.ToString(), font, Brushes.DarkBlue, (float)x, (float)y);
+                    graphics.DrawString(c.ToString(), font, Brushes.DarkBlue, point, format);
                 }
                 else
                 {
-                    graphics.DrawString(c.ToString(), font, Brushes.White, (float)x, (float)y);
+                    var brush = GetBrush(row, col);
+                    graphics.DrawString(c.ToString(), font, brush, point, format);
                 }
                 ++col;
                 x += charWidth;
@@ -98,9 +134,15 @@ class EditorView
         }
     }
 
+    private void UpdateFormat(int line)
+    {
+        colors[line] = highlighter.Highlight(lines[line]);
+    }
+
     public void AddChar(char c, Action<Bitmap> output)
     {
         lines[currentLine] = lines[currentLine].Substring(0, currentColumn) + c + lines[currentLine].Substring(currentColumn);
+        UpdateFormat(currentLine);
         ++currentColumn;
         RenderFrame();
         output(bitmap);
@@ -111,6 +153,7 @@ class EditorView
         if (currentColumn > 0)
         {
             lines[currentLine] = lines[currentLine].Substring(0, currentColumn - 1) + lines[currentLine].Substring(currentColumn);
+            UpdateFormat(currentLine);
             --currentColumn;
             RenderFrame();
             output(bitmap);
@@ -126,17 +169,15 @@ class EditorView
         Console.WriteLine($"Adding line {line} with text {text}");
         string indentation = GetIndentation(text);
         lines.Insert(line, indentation);
+        colors.Insert(line, indentation);
         MoveCursorTo(line, indentation.Length, output, true);
         RenderFrame();
         output(bitmap);
         for (int len = indentation.Length; len < text.Length; ++len)
         {
             AddChar(text[len], output);
-/*            lines[line] = text.Substring(0, len);
-            MoveCursorTo(line, lines[line].Length, output);
-            RenderFrame();
-            output(bitmap);*/
         }
+        System.Console.WriteLine($"Line {line} is colored       {colors[line]}");
     }
 
     public void DeleteLine(int line, Action<Bitmap> output)
@@ -144,6 +185,7 @@ class EditorView
         Console.WriteLine($"Deleting line {line} with text {lines[line]}");
         MoveCursorTo(line, 0, output);
         lines.RemoveAt(line);
+        colors.RemoveAt(line);
         RenderFrame();
         output(bitmap);
         output(bitmap);

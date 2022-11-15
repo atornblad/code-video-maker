@@ -50,7 +50,7 @@ class FfmpegProcess : IDisposable
             if (lastOutput.HasValue)
             {
                 var diff = now - lastOutput.Value;
-                Console.WriteLine($"Current speed ratio: {diff.TotalSeconds * 10.0:0.0} %");
+                Console.WriteLine($"Current speed ratio: {1000.0 / diff.TotalSeconds:0.0} %");
             }
             lastOutput = now;
             nextOutput += TimeSpan.FromSeconds(10.0);
