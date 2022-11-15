@@ -59,21 +59,13 @@ class EditorView
 
         double frameWidth = bitmap.Width;
         double frameHeight = bitmap.Height;
-        double titleHeight = frameHeight * 0.07;
 
         double totalWidth = frameWidth;
-        double totalHeight = frameHeight - titleHeight;
+        double totalHeight = frameHeight;
         double lineHeight = totalHeight / rowsPerScreen;
         double charWidth = lineHeight * 0.5;
-        double codeTop = titleHeight;
-        double codeBottom = titleHeight + totalHeight;
-
-        using (var blue = new SolidBrush(Color.FromArgb(255, 0, 0, 192)))
-        {
-            graphics.FillRectangle(blue, 0, 0, (float)frameWidth, (float)titleHeight);
-            graphics.DrawString(filename, new Font("Arial", (float)(titleHeight * 0.6)), Brushes.White, (float)(frameWidth / 400), 0);
-        }
-
+        double codeTop = 0.0;
+        double codeBottom = codeTop + totalHeight;
 
         using (var black = new SolidBrush(Color.FromArgb(192, 0, 0, 0)))
         {
@@ -89,10 +81,10 @@ class EditorView
         
         int row = topLine;
         double y = codeTop;
-        while (row < lines.Count && y < codeBottom)
+        while (row <= lines.Count && y < codeBottom)
         {
             if (row < 0) continue;
-            string line = lines[row] + " ";
+            string line = row == lines.Count ? " " : lines[row] + " ";
             double x = 0.0;
             int col = 0;
             foreach (char c in line)

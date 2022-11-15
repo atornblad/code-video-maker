@@ -1,5 +1,6 @@
 using System.Drawing;
 using CodeVideoMaker.Model;
+using CodeVideoMaker.Output;
 
 namespace CodeVideoMaker.Rendering;
 
@@ -23,6 +24,12 @@ class Coder : IDisposable
 
     }
 
+
+    public void RenderBlink(IOutput output, TimeSpan time)
+    {
+        editor.Blink(time, fps, output.AddFrame);
+    }
+
     /// <summary>
     /// Renders an entire file commit.
     /// </summary>
@@ -30,7 +37,7 @@ class Coder : IDisposable
     /// <param name="ffmpeg">The FfmpegProcess to render to.</param>
     /// <param name="cpm">Average characters per minute.</param>
     /// <param name="randomness">The randomness of the typing.</param>
-    public void Render(FileCommit fileCommit, FfmpegProcess ffmpeg, double cpm, double randomness)
+    public void Render(FileCommit fileCommit, IOutput output, double cpm, double randomness)
     {
         double secondsPerChar = 60.0 / cpm;
         double secondsPerFrame = 1.0 / fps;
@@ -38,11 +45,11 @@ class Coder : IDisposable
 
         foreach (var change in fileCommit.Changes)
         {
-            RenderChange(change, ffmpeg, framesPerChar, randomness);
+            RenderChange(change, output, framesPerChar, randomness);
         }
     }
 
-    private void RenderChange(Change change, FfmpegProcess ffmpeg, double framesPerChar, double randomness)
+    private void RenderChange(Change change, IOutput ffmpeg, double framesPerChar, double randomness)
     {
         ChangeRenderer changeRenderer = change switch
         {

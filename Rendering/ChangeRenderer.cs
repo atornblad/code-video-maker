@@ -1,17 +1,18 @@
 using System.Drawing;
 using CodeVideoMaker.Model;
+using CodeVideoMaker.Output;
 
 namespace CodeVideoMaker.Rendering
 {
     abstract class ChangeRenderer
     {
-        private FfmpegProcess ffmpeg;
+        private IOutput ffmpeg;
         protected double fps;
         protected double framesPerChar;
         protected double randomness;
         protected EditorView editor;
 
-        public ChangeRenderer(EditorView editor, FfmpegProcess ffmpeg, double fps, double framesPerChar, double randomness)
+        public ChangeRenderer(EditorView editor, IOutput ffmpeg, double fps, double framesPerChar, double randomness)
         {
             this.ffmpeg = ffmpeg;
             this.fps = fps;

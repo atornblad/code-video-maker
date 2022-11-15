@@ -1,5 +1,6 @@
 ﻿using System.Drawing;
 using CodeVideoMaker.Model;
+using CodeVideoMaker.Output;
 using CodeVideoMaker.Rendering;
 
 namespace CodeVideoMaker;
@@ -92,24 +93,36 @@ public static class Program
 
         var coders = new Dictionary<string, Coder>();
 
-        using (var ffmpeg = new FfmpegProcess(fps, videoFilename))
+        int titleHeight = height / 20;
+        int editorHeight = height - titleHeight;
+        using var ffmpeg = new FfmpegProcess(fps, videoFilename);
+        using var ide = new IdeOutput(width, height, titleHeight, ffmpeg);
+        string currentFilename = string.Empty;
+
         foreach (var commit in commits)
         {
             // TODO: Render a splash screen with the commit message, maybe?
             foreach (var fileCommit in commit.Changes)
             {
-                if (coders.TryGetValue(fileCommit.File!.Filename, out var coder))
+                string nextFilename = fileCommit.File!.Filename;
+                if (coders.TryGetValue(nextFilename, out var coder))
                 {
-                    Console.WriteLine($"Found coder for file {fileCommit.File.Filename}");
+                    Console.WriteLine($"Found coder for file {nextFilename}");
                 }
                 else
                 {
-                    Console.WriteLine($"Creating new coder for file {fileCommit.File.Filename}");
-                    coder = new Coder(width, height, fps, fileCommit.File.Filename, Array.Empty<string>());
-                    coders.Add(fileCommit.File.Filename, coder);
+                    Console.WriteLine($"Creating new coder for file {nextFilename}");
+                    coder = new Coder(width, editorHeight, fps, nextFilename, Array.Empty<string>());
+                    coders.Add(nextFilename, coder);
                 }
-                int cpm = fileCommit.File.Filename.EndsWith(".html") ? 1500 : 1000;
-                coder.Render(fileCommit, ffmpeg, cpm, 1.5);
+                int cpm = nextFilename.EndsWith(".html") ? 1500 : 1000;
+                ide.SetFilename(nextFilename);
+                if (nextFilename != currentFilename)
+                {
+                    coder.RenderBlink(ide, TimeSpan.FromSeconds(2.0));
+                }
+                currentFilename = nextFilename;
+                coder.Render(fileCommit, ide, cpm, 1.5);
             }
         }
     }

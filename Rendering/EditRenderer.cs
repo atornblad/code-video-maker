@@ -1,5 +1,6 @@
 using System.Drawing;
 using CodeVideoMaker.Model;
+using CodeVideoMaker.Output;
 
 namespace CodeVideoMaker.Rendering;
 
@@ -7,7 +8,7 @@ class EditRenderer : ChangeRenderer
 {
     private Edit edit;
 
-    public EditRenderer(Edit edit, EditorView editor, FfmpegProcess ffmpeg, double fps, double framesPerChar, double randomness)
+    public EditRenderer(Edit edit, EditorView editor, IOutput ffmpeg, double fps, double framesPerChar, double randomness)
     : base(editor, ffmpeg, fps, framesPerChar, randomness)
     {
         this.edit = edit;

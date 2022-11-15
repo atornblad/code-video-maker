@@ -1,5 +1,6 @@
 using System.Drawing;
 using CodeVideoMaker.Model;
+using CodeVideoMaker.Output;
 
 namespace CodeVideoMaker.Rendering
 {
@@ -7,7 +8,7 @@ namespace CodeVideoMaker.Rendering
     {
         private Deletion deletion;
         
-        public DeletionRenderer(Deletion deletion, EditorView editor, FfmpegProcess ffmpeg, double fps, double framesPerChar, double randomness)
+        public DeletionRenderer(Deletion deletion, EditorView editor, IOutput ffmpeg, double fps, double framesPerChar, double randomness)
             : base(editor, ffmpeg, fps, framesPerChar, randomness)
         {
             this.deletion = deletion;

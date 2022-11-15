@@ -2,9 +2,9 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 
-namespace CodeVideoMaker;
+namespace CodeVideoMaker.Output;
 
-class FfmpegProcess : IDisposable
+class FfmpegProcess : IOutput
 {
     private Process process;
     private const int DEFAULT_FPS = 60;
