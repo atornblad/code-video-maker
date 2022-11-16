@@ -61,6 +61,22 @@ class Coder : IDisposable
         changeRenderer.Render();
     }
 
+    public void RenderSwitchToFile(IOutput output, string filename, string[] filenames)
+    {
+    }
+
+    public void RenderNewFile(IOutput output, string filename)
+    {
+        using var renderer = new FileNewRenderer(filename, bitmap.Width, bitmap.Height, output, fps);
+        renderer.Render();
+    }
+
+    public void RenderSwitchToFile(IOutput output, string currentFilename, string nextFilename, string[] allFiles)
+    {
+        using var renderer = new SwitchRenderer(allFiles, currentFilename, nextFilename, bitmap.Width, bitmap.Height, output, fps);
+        renderer.Render();
+    }
+
     #region IDisposable
     private bool disposedValue;
     protected virtual void Dispose(bool disposing)

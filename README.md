@@ -3,7 +3,7 @@
 Get a full git log from an adjacent repository:
 
 ```bash
-git log --reverse -p > ../code-video-maker/git-log-p-output.txt
+git log --reverse -p -U99999 > ../code-video-maker/git-log-p-output.txt
 ```
 
 Render a quick video:
@@ -23,3 +23,7 @@ Render a 4K video:
 ```bash
 dotnet run -- -w 3840 -f 60 -o hd4k.mp4
 ```
+
+# TO DO
+
+Utilize the fact that -U99999 is recommended to automatically build initial lines for videos that don't start with empty files!

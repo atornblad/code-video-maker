@@ -37,14 +37,25 @@ namespace CodeVideoMaker.Rendering
                 }
             };
 
+            Action<Bitmap> fastAddFrameForTyping = (bitmap) => 
+            {
+                while (nextTyping > time + 0.5)
+                {
+                    AddFrame(bitmap);
+                    time += 1.0;
+                }
+                double addTime = framesPerChar * 0.2;
+                nextTyping += addTime;
+            };
+
             editor.MoveCursorTo(addition.FirstLineNumber, 0, AddFrame);
 
             for (int i = 0; i < addition.Lines.Length; ++i)
             {
-                editor.AddLine(addition.FirstLineNumber + i, addition.Lines[i], addFrameForTyping);
+                editor.AddLine(addition.FirstLineNumber + i, addition.Lines[i], addition.SuperFast ? fastAddFrameForTyping : addFrameForTyping);
             }
 
-            editor.Blink(TimeSpan.FromSeconds(3.0), fps, AddFrame);
+            editor.Blink(TimeSpan.FromSeconds(addition.SuperFast ? 2.0 : 3.0), fps, AddFrame);
         }
     }
 }

@@ -107,7 +107,11 @@ class Commit
                 }
                 else
                 {
-                    addition = new Addition { FirstLineNumber = targetRow!.Value - 1 };
+                    addition = new Addition
+                    {
+                        FirstLineNumber = targetRow!.Value - 1,
+                        SuperFast = commit!.Message.Contains("SuperFast", StringComparison.InvariantCultureIgnoreCase)
+                    };
                     fileCommit!.Changes.Add(addition);
                     change = addition;
                     addition.Add(lines[i].Substring(1));
@@ -125,7 +129,11 @@ class Commit
                 }
                 else
                 {
-                    deletion = new Deletion { FirstLineNumber = targetRow!.Value - 1 };
+                    deletion = new Deletion
+                    {
+                        FirstLineNumber = targetRow!.Value - 1,
+                        SuperFast = commit!.Message.Contains("SuperFast", StringComparison.InvariantCultureIgnoreCase)
+                    };
                     fileCommit!.Changes.Add(deletion);
                     change = deletion;
                     deletion.Add(lines[i].Substring(1));
@@ -138,6 +146,7 @@ class Commit
             else if (lines[i].StartsWith(" "))
             {
                 ++targetRow;
+                change = null;
                 ++i;
             }
             else

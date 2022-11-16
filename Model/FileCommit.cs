@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace CodeVideoMaker.Model;
 
 // The FileCommit class doesn't reflect a real Git commit, but rather the changes
@@ -23,11 +25,11 @@ class FileCommit
             if (changes[i] is Deletion deletion && changes[i + 1] is Addition addition)
             {
                 if (deletion.FirstLineNumber != addition.FirstLineNumber) continue;
-                // First special case: delete one line and add one line
-                if (deletion.Lines.Length != 1 || addition.Lines.Length != 1) continue;
+                // Delete exactly one line and add one or more line
+                if (deletion.Lines.Length != 1) continue;
                 string deletedLine = deletion.Lines[0];
                 string addedLine = addition.Lines[0];
-                Console.WriteLine($"Checking if {deletedLine} can be replaced with {addedLine}");
+                Debug.WriteLine($"Checking if {deletedLine} can be replaced with {addedLine}");
                 // Number of letters common at the start of both lines
                 int commonStart = 0;
                 while (commonStart < deletedLine.Length && commonStart < addedLine.Length && deletedLine[commonStart] == addedLine[commonStart])
@@ -43,7 +45,7 @@ class FileCommit
                 // If the common start and end is at least half of the shortest line, we can join the deletion and addition
                 if (commonStart + commonEnd >= Math.Min(deletedLine.Length, addedLine.Length) / 2)
                 {
-                    // Join the deletion and addition
+                    // Join the deletion and first line of the addition
                     var edit = new Edit
                     {
                         FirstLineNumber = deletion.FirstLineNumber,
@@ -59,10 +61,21 @@ class FileCommit
                             }
                         }
                     };
-                    Console.WriteLine($"Joined deletion and addition at line: {edit.Edits[0]}");
-                    changes.RemoveAt(i);
+                    // Remove the first line from the addition
+                    addition.Lines = addition.Lines.Skip(1).ToArray();
+                    addition.FirstLineNumber++;
+                    Debug.WriteLine($"Joined deletion and addition at line: {edit.Edits[0]}");
                     changes.RemoveAt(i);
                     changes.Insert(i, edit);
+                    // If the addition is now empty, remove it
+                    if (addition.Lines.Length == 0)
+                    {
+                        changes.RemoveAt(i + 1);
+                    }
+                    else
+                    {
+                        changes[i] = edit;
+                    }
                 }
 
             }

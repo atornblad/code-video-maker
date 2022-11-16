@@ -14,6 +14,7 @@ public static class Program
         int? height = null;
         int? fps = null;
         string? output = null;
+        int? maxCommitCount = null;
 
         for (int i = 0; i < args.Length; ++i)
         {
@@ -28,6 +29,10 @@ public static class Program
             else if (args[i] == "-f" || args[i] == "--fps")
             {
                 fps = int.Parse(args[++i]);
+            }
+            else if (args[i] == "-c" || args[i] == "--commits")
+            {
+                maxCommitCount = int.Parse(args[++i]);
             }
             else if (args[i] == "-o" || args[i] == "--output")
             {
@@ -52,42 +57,34 @@ public static class Program
         {
             fps = 30;
         }
-
-        /*var image = new Bitmap(1920, 1080);
-        var graphics = Graphics.FromImage(image);
-        using (var ffmpeg = new FfmpegProcess())
+        if (output == null)
         {
-            for (int i = 0; i < 300; ++i)
-            {
-                graphics.Clear(Color.FromArgb(255, (i * 255 / 300), 128, 192));
-                graphics.DrawString("Hello World!", new Font("Arial", 200), Brushes.Black, (float)(100 + 200 * Math.Sin(i * 0.04)), (float)(200 - 200 * Math.Cos(i * 0.04)));
-                ffmpeg.AddFrame(image);
-            }
-        }*/
-        //RenderNewAddedFile1(width.Value, height!.Value, fps.Value);
-        RenderGitLog(width.Value, height.Value, fps.Value, "git-log-p-output.txt", output);
+            output = "output.mp4";
+        }
+
+        RenderGitLog(width.Value, height!.Value, fps.Value, "git-log-p-output.txt", maxCommitCount, output);
     }
 
-    static void RenderGitLog(int width, int height, int fps, string repoOrDiffPath, string videoFilename)
+    static void RenderGitLog(int width, int height, int fps, string repoOrDiffPath, int? maxCommitCount, string videoFilename)
     {
         System.Console.WriteLine($"Rendering git log from {repoOrDiffPath} to {videoFilename} at {width}x{height} at {fps} fps");
         string fullPath = Path.Combine(Environment.CurrentDirectory, repoOrDiffPath);
         if (File.Exists(fullPath))
         {
-            RenderGitLogFromDiff(width, height, fps, fullPath, videoFilename);
+            RenderGitLogFromDiff(width, height, fps, fullPath, maxCommitCount, videoFilename);
         }
         else
         {
-            RenderGitLogFromRepo(width, height, fps, fullPath, videoFilename);
+            RenderGitLogFromRepo(width, height, fps, fullPath, maxCommitCount, videoFilename);
         }
     }
 
-    private static void RenderGitLogFromRepo(int width, int height, int fps, string fullPath, string videoFilename)
+    private static void RenderGitLogFromRepo(int width, int height, int fps, string fullPath, int? maxCommitCount, string videoFilename)
     {
         throw new NotImplementedException();
     }
 
-    private static void RenderGitLogFromDiff(int width, int height, int fps, string fullPath, string videoFilename)
+    private static void RenderGitLogFromDiff(int width, int height, int fps, string fullPath, int? maxCommitCount, string videoFilename)
     {
         string[] lines = File.ReadAllLines(fullPath);
         IEnumerable<Commit> commits = Commit.CreateCommitsFromDiff(lines);
@@ -99,31 +96,47 @@ public static class Program
         using var ffmpeg = new FfmpegProcess(fps, videoFilename);
         using var ide = new IdeOutput(width, height, titleHeight, ffmpeg);
         string currentFilename = string.Empty;
+        Coder? coder = null;
 
-        foreach (var commit in commits)
+        var commitList = maxCommitCount.HasValue ? commits.Take(maxCommitCount.Value) : commits;
+        foreach (var commit in commitList)
         {
+            Console.WriteLine($"Rendering commit {commit.Message}");
             // TODO: Render a splash screen with the commit message, maybe?
             foreach (var fileCommit in commit.Changes)
             {
                 string nextFilename = fileCommit.File!.Filename;
-                if (coders.TryGetValue(nextFilename, out var coder))
+                if (nextFilename != currentFilename)
                 {
-                    Debug.WriteLine($"Found coder for file {nextFilename}");
-                }
-                else
-                {
-                    Debug.WriteLine($"Creating new coder for file {nextFilename}");
-                    coder = new Coder(width, editorHeight, fps, nextFilename, Array.Empty<string>());
-                    coders.Add(nextFilename, coder);
+                    if (coder == null)
+                    {
+                        coder = new Coder(width, editorHeight, fps, "New file", Array.Empty<string>());
+                    }
+
+                    coder.RenderBlink(ide, TimeSpan.FromSeconds(2.0));
+
+                    if (coders.TryGetValue(nextFilename, out var nextCoder))
+                    {
+                        Debug.WriteLine($"Found coder for file {nextFilename}");
+                        coder.RenderSwitchToFile(ide, currentFilename, nextFilename, coders.Keys.ToArray());
+                        coder = nextCoder;
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"Creating new coder for file {nextFilename}");
+                        coder.RenderNewFile(ide, nextFilename);
+                        coder = new Coder(width, editorHeight, fps, nextFilename, Array.Empty<string>());
+                        coders.Add(nextFilename, coder);
+                    }
                 }
                 int cpm = nextFilename.EndsWith(".html") ? 1500 : 1000;
                 ide.SetFilename(nextFilename);
                 if (nextFilename != currentFilename)
                 {
-                    coder.RenderBlink(ide, TimeSpan.FromSeconds(2.0));
+                    coder!.RenderBlink(ide, TimeSpan.FromSeconds(2.0));
                 }
                 currentFilename = nextFilename;
-                coder.Render(fileCommit, ide, cpm, 1.5);
+                coder!.Render(fileCommit, ide, cpm, 1.5);
             }
         }
     }

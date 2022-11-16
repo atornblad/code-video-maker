@@ -108,7 +108,9 @@ diff --git a/index.html b/index.html
 index fa17478..b39bbe8 100644
 --- a/index.html
 +++ b/index.html
-@@ -3,6 +3,6 @@
+@@ -1,8 +1,8 @@
+ <html>
+ <head>
      <title>JS Mod Player by Anders Marzi Tornblad</title>
  </head>
  <body>
@@ -127,7 +129,16 @@ diff --git a/player.js b/player.js
 index 0e4cf73..1f77697 100644
 --- a/player.js
 +++ b/player.js
-@@ -10,7 +10,10 @@ const player = new AudioWorkletNode(audio, 'player-worklet');
+@@ -1,16 +1,19 @@
+ // Create the audio context
+ const audio = new AudioContext();
+ 
+ // Load an audio worklet
+ await audio.audioWorklet.addModule('./player-worklet.js');
+ 
+ // Create a player
+ const player = new AudioWorkletNode(audio, 'player-worklet');
+ 
  // Connect the player to the audio context
  player.connect(audio.destination);
  
@@ -173,7 +184,7 @@ diff --git a/loader.js b/loader.js
 index 53ff1e9..df6a7f5 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -1,3 +1,31 @@
+@@ -1,7 +1,35 @@
 +class Mod
 +{
 +    constructor(bytes) {
@@ -205,6 +216,10 @@ index 53ff1e9..df6a7f5 100644
  // Load MOD file
  export const loadMod = async (url) => {
      const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit 9414c372f05bf314bc4ef55778a19acb4aae970a
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -216,7 +231,19 @@ diff --git a/loader.js b/loader.js
 index df6a7f5..2e8dfc5 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -13,6 +13,11 @@ class Mod
+@@ -1,35 +1,40 @@
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
          //    26..27: Half of loop start
          //    28..29: Half of loop length
          // 
@@ -228,6 +255,23 @@ index df6a7f5..2e8dfc5 100644
          // Song data starts at byte 950
          //  950: Song length
          //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit 5f5bf65d774a28d7e50a7ecc79885a2df32e5229
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -239,7 +283,7 @@ diff --git a/loader.js b/loader.js
 index 2e8dfc5..2200169 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -1,3 +1,15 @@
+@@ -1,40 +1,52 @@
 +
 +const initInstrument = (bytes, start) => {
 +    return {
@@ -255,6 +299,43 @@ index 2e8dfc5..2200169 100644
  class Mod
  {
      constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             this.instruments[i] = initInstrument(bytes, 20 + i * 30);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit f6c0657c20bfd6c5aa3186eb928469c47a245a0e
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -266,13 +347,18 @@ diff --git a/player.js b/player.js
 index 1f77697..0f35ee5 100644
 --- a/player.js
 +++ b/player.js
-@@ -1,3 +1,5 @@
+@@ -1,19 +1,26 @@
 +import { loadMod } from './loader.js';
 +
  // Create the audio context
  const audio = new AudioContext();
  
-@@ -10,6 +12,11 @@ const player = new AudioWorkletNode(audio, 'player-worklet');
+ // Load an audio worklet
+ await audio.audioWorklet.addModule('./player-worklet.js');
+ 
+ // Create a player
+ const player = new AudioWorkletNode(audio, 'player-worklet');
+ 
  // Connect the player to the audio context
  player.connect(audio.destination);
  
@@ -284,6 +370,10 @@ index 1f77697..0f35ee5 100644
  // Play something when the user clicks the window
  window.onclick = () => {
      audio.resume();
+     player.port.postMessage({
+         type: 'play'
+     });
+ };
 
 commit 483a63f19027d2cfd926ef7787c3c67aff512f00
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -295,7 +385,34 @@ diff --git a/loader.js b/loader.js
 index 2200169..e2041bf 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -28,6 +28,7 @@ class Mod
+@@ -1,52 +1,53 @@
+ 
+ const initInstrument = (bytes, start) => {
+     return {
+         length: 2 * (bytes[start + 22] * 256 + bytes[start + 23]),
+         finetune: bytes[start + 24],
+         volume: bytes[start + 25],
+         loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
          // First just get the raw data for each instrument
          this.instruments = [];
          for (let i = 0; i < 31; ++i) {
@@ -303,6 +420,25 @@ index 2200169..e2041bf 100644
              this.instruments[i] = initInstrument(bytes, 20 + i * 30);
          }
          // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit adeb33628722472b6a4b4f3e68308a68f0a58cb6
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -314,7 +450,35 @@ diff --git a/loader.js b/loader.js
 index e2041bf..2eebe10 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -29,7 +29,7 @@ class Mod
+@@ -1,53 +1,53 @@
+ 
+ const initInstrument = (bytes, start) => {
+     return {
+         length: 2 * (bytes[start + 22] * 256 + bytes[start + 23]),
+         finetune: bytes[start + 24],
+         volume: bytes[start + 25],
+         loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
          this.instruments = [];
          for (let i = 0; i < 31; ++i) {
              const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
@@ -323,6 +487,24 @@ index e2041bf..2eebe10 100644
          }
          // Song data starts at byte 950
          //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit 6b31da6255c5af089f3fa8e035e0d90f1ce2982d
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -334,13 +516,61 @@ diff --git a/loader.js b/loader.js
 index 2eebe10..2ae90ba 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -1,5 +1,5 @@
+@@ -1,53 +1,53 @@
  
 -const initInstrument = (bytes, start) => {
 +const initInstrument = (bytes) => {
      return {
          length: 2 * (bytes[start + 22] * 256 + bytes[start + 23]),
          finetune: bytes[start + 24],
+         volume: bytes[start + 25],
+         loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit 351e22fcebc141bdf174e2ba15bf82b4d0f33695
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -352,7 +582,7 @@ diff --git a/loader.js b/loader.js
 index 2ae90ba..4cad9d9 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -1,7 +1,7 @@
+@@ -1,53 +1,53 @@
  
  const initInstrument = (bytes) => {
      return {
@@ -361,6 +591,52 @@ index 2ae90ba..4cad9d9 100644
          finetune: bytes[start + 24],
          volume: bytes[start + 25],
          loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit fc2d961ed064eb9aadeea7a5e3c081d2149142d8
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -372,7 +648,7 @@ diff --git a/loader.js b/loader.js
 index 4cad9d9..f77783c 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -1,7 +1,7 @@
+@@ -1,53 +1,53 @@
  
  const initInstrument = (bytes) => {
      return {
@@ -381,6 +657,52 @@ index 4cad9d9..f77783c 100644
          finetune: bytes[start + 24],
          volume: bytes[start + 25],
          loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
+         loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit 7bf16a518c33b6cabaa2e29d7cceae2c5f83abf7
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -392,7 +714,8 @@ diff --git a/loader.js b/loader.js
 index f77783c..748988c 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -2,7 +2,7 @@
+@@ -1,53 +1,53 @@
+ 
  const initInstrument = (bytes) => {
      return {
          length: 2 * (bytes[22] * 256 + bytes[23]),
@@ -401,6 +724,51 @@ index f77783c..748988c 100644
          volume: bytes[start + 25],
          loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
          loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
+         bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit 63e2c757535fcbc7bf897ec61d879162738ad132
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -412,7 +780,9 @@ diff --git a/loader.js b/loader.js
 index 748988c..c9e5a7d 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -3,7 +3,7 @@ const initInstrument = (bytes) => {
+@@ -1,53 +1,53 @@
+ 
+ const initInstrument = (bytes) => {
      return {
          length: 2 * (bytes[22] * 256 + bytes[23]),
          finetune: bytes[24],
@@ -421,6 +791,50 @@ index 748988c..c9e5a7d 100644
          loopStart: 2 * (bytes[start + 26] * 256 + bytes[start + 27]),
          loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
          bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit e73910d0afe29ae13d5d7b041f0baf573c2c30f7
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -432,7 +846,10 @@ diff --git a/loader.js b/loader.js
 index c9e5a7d..6eef484 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -4,7 +4,7 @@ const initInstrument = (bytes) => {
+@@ -1,53 +1,53 @@
+ 
+ const initInstrument = (bytes) => {
+     return {
          length: 2 * (bytes[22] * 256 + bytes[23]),
          finetune: bytes[24],
          volume: bytes[25],
@@ -441,6 +858,49 @@ index c9e5a7d..6eef484 100644
          loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
          bytes: null
      };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit 450095aeeb99d64beb75cde61245e0d174bb7001
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -452,7 +912,10 @@ diff --git a/loader.js b/loader.js
 index 6eef484..1f1669b 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -4,7 +4,7 @@ const initInstrument = (bytes) => {
+@@ -1,53 +1,53 @@
+ 
+ const initInstrument = (bytes) => {
+     return {
          length: 2 * (bytes[22] * 256 + bytes[23]),
          finetune: bytes[24],
          volume: bytes[25],
@@ -461,6 +924,49 @@ index 6eef484..1f1669b 100644
          loopLength: 2 * (bytes[start + 28] * 256 + bytes[start + 29]),
          bytes: null
      };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
 
 commit 5e78e94895dfc40cec859e11d1ab3c6a2736f813
 Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
@@ -472,7 +978,11 @@ diff --git a/loader.js b/loader.js
 index 1f1669b..04ef2fa 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -5,7 +5,7 @@ const initInstrument = (bytes) => {
+@@ -1,53 +1,53 @@
+ 
+ const initInstrument = (bytes) => {
+     return {
+         length: 2 * (bytes[22] * 256 + bytes[23]),
          finetune: bytes[24],
          volume: bytes[25],
          loopStart: 2 * (bytes[26] * 256 + bytes[27]),
@@ -480,6 +990,48 @@ index 1f1669b..04ef2fa 100644
 +        loopLength: 2 * (bytes[28] * 256 + bytes[start + 29]),
          bytes: null
      };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
  };
 
 commit e7581a0606997b10f74e13a74dca47247753f853
@@ -492,7 +1044,11 @@ diff --git a/loader.js b/loader.js
 index 04ef2fa..f165942 100644
 --- a/loader.js
 +++ b/loader.js
-@@ -5,7 +5,7 @@ const initInstrument = (bytes) => {
+@@ -1,53 +1,53 @@
+ 
+ const initInstrument = (bytes) => {
+     return {
+         length: 2 * (bytes[22] * 256 + bytes[23]),
          finetune: bytes[24],
          volume: bytes[25],
          loopStart: 2 * (bytes[26] * 256 + bytes[27]),
@@ -501,3 +1057,437 @@ index 04ef2fa..f165942 100644
          bytes: null
      };
  };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         // ????: Sample data
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
+
+commit e97ef5132968dda3eccbeb691862c1378e28c3e1
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:47:25 2022 +0100
+
+    Extract sample bytes for all instruments
+
+diff --git a/loader.js b/loader.js
+index f165942..ec30479 100644
+--- a/loader.js
++++ b/loader.js
+@@ -1,53 +1,62 @@
+ 
+ const initInstrument = (bytes) => {
+     return {
+         length: 2 * (bytes[22] * 256 + bytes[23]),
+         finetune: bytes[24],
+         volume: bytes[25],
+         loopStart: 2 * (bytes[26] * 256 + bytes[27]),
+         loopLength: 2 * (bytes[28] * 256 + bytes[29]),
+         bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
++        // Get the highest pattern index
++        const patternTable = new Uint8Array(bytes, 952, 128);
++        const maxPatternIndex = Math.max(...patternTable);
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
++        let sampleStart = 1084 + 1024 * (maxPatternIndex + 1);
+         // ????: Sample data
++        for (let i = 0; i < 31; ++i) {
++            const instrument = this.instruments[i];
++            instrument.bytes = new Uint8Array(bytes, sampleStart, instrument.length);
++            sampleStart += instrument.length;
++        }
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
+
+commit 79220cce65d31e60a8df3b9548cf125bb83aee6f
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:51:15 2022 +0100
+
+    Sending sample to player worklet
+
+diff --git a/player.js b/player.js
+index 0f35ee5..b33b3ff 100644
+--- a/player.js
++++ b/player.js
+@@ -1,26 +1,27 @@
+ import { loadMod } from './loader.js';
+ 
+ // Create the audio context
+ const audio = new AudioContext();
+ 
+ // Load an audio worklet
+ await audio.audioWorklet.addModule('./player-worklet.js');
+ 
+ // Create a player
+ const player = new AudioWorkletNode(audio, 'player-worklet');
+ 
+ // Connect the player to the audio context
+ player.connect(audio.destination);
+ 
+ // Load song from Enigma by Phenomena
+ // Made by Firefox (Jimmy Fredriksson) and Tip (Robert Ling)
+ const url = 'https://api.modarchive.org/downloads.php?moduleid=101789';
+ const mod = await loadMod(url);
+ 
+ // Play something when the user clicks the window
+ window.onclick = () => {
+     audio.resume();
+     player.port.postMessage({
+-        type: 'play'
++        type: 'play',
++        sample: mod.instruments[0].bytes
+     });
+ };
+
+commit eec0dfd07c3f5cff782de7a5f3bf9565f7729851
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 13:59:14 2022 +0100
+
+    Play sample att full frequency
+
+diff --git a/player-worklet.js b/player-worklet.js
+index 544423c..10c2cc7 100644
+--- a/player-worklet.js
++++ b/player-worklet.js
+@@ -1,37 +1,38 @@
+ // The PlayerWorklet class
+ class PlayerWorklet extends AudioWorkletProcessor {
+     constructor(options) {
+         super(options);
+         this.port.onmessage = this.onmessage.bind(this);
+-        this.playing = false;
++        this.playing = null;
+     }
+ 
+     onmessage(e) {
+         if (e.data.type === 'play') {
+-            this.playing = !this.playing;
++            this.playing = e.data.sample;
+-            this.phase = 0;
++            this.index = 0;
+         }
+     }
+ 
+     process(inputs, outputs) {
+         const output = outputs[0];
+         const channel = output[0];
+ 
+-        if (!this.playing) {
+-            // Silence
+-            for (let i = 0; i < channel.length; ++i) {
+-                channel[i] = 0.0;
+-            }
+-            return true;
+-        }
+-
+-        // Generate a sine wave
+         for (let i = 0; i < channel.length; ++i) {
+-            channel[i] = Math.sin(this.phase);
+-            this.phase += 0.1;
++            if (this.playing == null) {
++                channel[i] = 0;
++            }
++            else if (this.index >= this.playing.length) {
++                this.playing = null;
++                channel[i] = 0;
++            }
++            else {
++                channel[i] = this.playing[this.index] / 256.0;
++                this.index ++;
++            }
+         }
++        
+         return true;
+     }
+ }
+ 
+ registerProcessor('player-worklet', PlayerWorklet);
+
+commit fa5fc8fe56b2f1f3c2bf8b9d77dd05e2441aa025
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 14:02:31 2022 +0100
+
+    48kHz is too much so lower frequency
+
+diff --git a/player-worklet.js b/player-worklet.js
+index 10c2cc7..a448992 100644
+--- a/player-worklet.js
++++ b/player-worklet.js
+@@ -1,38 +1,38 @@
+ // The PlayerWorklet class
+ class PlayerWorklet extends AudioWorkletProcessor {
+     constructor(options) {
+         super(options);
+         this.port.onmessage = this.onmessage.bind(this);
+         this.playing = null;
+     }
+ 
+     onmessage(e) {
+         if (e.data.type === 'play') {
+             this.playing = e.data.sample;
+             this.index = 0;
+         }
+     }
+ 
+     process(inputs, outputs) {
+         const output = outputs[0];
+         const channel = output[0];
+ 
+         for (let i = 0; i < channel.length; ++i) {
+             if (this.playing == null) {
+                 channel[i] = 0;
+             }
+             else if (this.index >= this.playing.length) {
+                 this.playing = null;
+                 channel[i] = 0;
+             }
+             else {
+-                channel[i] = this.playing[this.index] / 256.0;
++                channel[i] = this.playing[this.index | 0] / 256.0;
+-                this.index ++;
++                this.index += 0.15;
+             }
+         }
+         
+         return true;
+     }
+ }
+ 
+ registerProcessor('player-worklet', PlayerWorklet);
+
+commit 7158212596beae985a90583544d8c24411d797d1
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 14:02:47 2022 +0100
+
+    Sample bytes are signed
+
+diff --git a/loader.js b/loader.js
+index ec30479..0b702fc 100644
+--- a/loader.js
++++ b/loader.js
+@@ -1,62 +1,62 @@
+ 
+ const initInstrument = (bytes) => {
+     return {
+         length: 2 * (bytes[22] * 256 + bytes[23]),
+         finetune: bytes[24],
+         volume: bytes[25],
+         loopStart: 2 * (bytes[26] * 256 + bytes[27]),
+         loopLength: 2 * (bytes[28] * 256 + bytes[29]),
+         bytes: null
+     };
+ };
+ 
+ class Mod
+ {
+     constructor(bytes) {
+         // Source: http://lclevy.free.fr/mo3/mod.txt
+         // First 20 bytes are the name of the song
+         // 
+         // Instrument data starts at byte 20
+         // There are 31 instruments with this structure
+         //     0..21: Instrument name
+         //    22..23: Half of sample length
+         //        24: Finetune
+         //        25: Volume
+         //    26..27: Half of loop start
+         //    28..29: Half of loop length
+         // 
+         // First just get the raw data for each instrument
+         this.instruments = [];
+         for (let i = 0; i < 31; ++i) {
+             const instrumentData = new Uint8Array(bytes, 20 + i * 30, 30);
+             this.instruments[i] = initInstrument(instrumentData);
+         }
+         // Song data starts at byte 950
+         //  950: Song length
+         //  951: Restart position
+         //  952: Pattern table (128 bytes)
+         // Get the highest pattern index
+         const patternTable = new Uint8Array(bytes, 952, 128);
+         const maxPatternIndex = Math.max(...patternTable);
+         // 1080: Magic string "M.K."
+         // 1084: Pattern data
+         //       Each pattern is 1024 bytes
+         //       Number of patterns stored depends on the
+         //       highest value in the pattern table
+         let sampleStart = 1084 + 1024 * (maxPatternIndex + 1);
+         // ????: Sample data
+         for (let i = 0; i < 31; ++i) {
+             const instrument = this.instruments[i];
+-            instrument.bytes = new Uint8Array(bytes, sampleStart, instrument.length);
++            instrument.bytes = new Int8Array(bytes, sampleStart, instrument.length);
+             sampleStart += instrument.length;
+         }
+     }
+ }
+ 
+ // Load MOD file
+ export const loadMod = async (url) => {
+     const response = await fetch(url);
+     const arrayBuffer = await response.arrayBuffer();
+     const mod = new Mod(arrayBuffer);
+     return mod;
+ };
+
+commit 2b333ab0699d24740ca5582c3ccbd3dbfd1332a8
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 14:08:26 2022 +0100
+
+    SUPERFAST added buttons to play samples
+
+diff --git a/index.html b/index.html
+index b39bbe8..0088909 100644
+--- a/index.html
++++ b/index.html
+@@ -1,8 +1,26 @@
+ <html>
+ <head>
+     <title>JS Mod Player by Anders Marzi Tornblad</title>
+ </head>
+ <body>
++    <button class="sample" id="0">Sample 0</button>
++    <button class="sample" id="1">Sample 1</button>
++    <button class="sample" id="2">Sample 2</button>
++    <button class="sample" id="3">Sample 3</button>
++    <button class="sample" id="4">Sample 4</button>
++    <button class="sample" id="5">Sample 5</button>
++    <button class="sample" id="6">Sample 6</button>
++    <button class="sample" id="7">Sample 7</button>
++    <br>
++    <br>
++    <button class="sample" id="8">Sample 8</button>
++    <button class="sample" id="9">Sample 9</button>
++    <button class="sample" id="10">Sample A</button>
++    <button class="sample" id="11">Sample B</button>
++    <button class="sample" id="12">Sample C</button>
++    <button class="sample" id="13">Sample D</button>
++    <button class="sample" id="14">Sample E</button>
++    <button class="sample" id="15">Sample F</button>
+     <script src="player.js" type="module"></script>
+ </body>
+ </html>
+
+commit 4e422e1bdc21ed86da641be10e4bd0f086e2d956
+Author: Anders Marzi Tornblad <anders.marzi.tornblad@soderbergpartners.se>
+Date:   Tue Nov 15 14:09:16 2022 +0100
+
+    Play the individual samples
+
+diff --git a/player.js b/player.js
+index b33b3ff..5b6c71c 100644
+--- a/player.js
++++ b/player.js
+@@ -1,27 +1,31 @@
+ import { loadMod } from './loader.js';
+ 
+ // Create the audio context
+ const audio = new AudioContext();
+ 
+ // Load an audio worklet
+ await audio.audioWorklet.addModule('./player-worklet.js');
+ 
+ // Create a player
+ const player = new AudioWorkletNode(audio, 'player-worklet');
+ 
+ // Connect the player to the audio context
+ player.connect(audio.destination);
+ 
+ // Load song from Enigma by Phenomena
+ // Made by Firefox (Jimmy Fredriksson) and Tip (Robert Ling)
+ const url = 'https://api.modarchive.org/downloads.php?moduleid=101789';
+ const mod = await loadMod(url);
+ 
+ // Play something when the user clicks the window
+-window.onclick = () => {
++window.addEventListener('click', e => {
+     audio.resume();
+-    player.port.postMessage({
+-        type: 'play',
+-        sample: mod.instruments[0].bytes
+-    });
++
++    if (e.target.matches('button.sample')) {
++        const sampleIndex = parseInt(e.target.id);
++        player.port.postMessage({
++            type: 'play',
++            sample: mod.instruments[sampleIndex].bytes
++        });
++    }
+-};
++});

@@ -215,7 +215,14 @@ class EditorView
             output(bitmap);
         }
 
-        if (instantColumn) currentColumn = column;
+        bool isHome = currentLine >= lines.Count || currentColumn < GetIndentation(lines[currentLine]).Length;
+
+        if (instantColumn || isHome)
+        {
+            currentColumn = column;
+            RenderFrame();
+            output(bitmap);
+        }
         while (currentColumn != column)
         {
             if (currentColumn < column)
