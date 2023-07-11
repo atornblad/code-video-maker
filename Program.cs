@@ -3,6 +3,7 @@ using System.Drawing;
 using CodeVideoMaker.Model;
 using CodeVideoMaker.Output;
 using CodeVideoMaker.Rendering;
+using CodeVideoMaker.Rendering.CutScenes;
 
 namespace CodeVideoMaker;
 
@@ -15,6 +16,11 @@ public static class Program
         int? fps = null;
         string? output = null;
         int? maxCommitCount = null;
+        string? repo = null;
+        bool opening = false;
+        string? title = null;
+        string? subtitle = null;
+        int? backgroundSeconds = null;
 
         for (int i = 0; i < args.Length; ++i)
         {
@@ -37,6 +43,20 @@ public static class Program
             else if (args[i] == "-o" || args[i] == "--output")
             {
                 output = args[++i];
+            }
+            else if (args[i] == "-r" || args[i] == "--repo")
+            {
+                repo = args[++i];
+            }
+            else if (args[i] == "-O" || args[i] == "--opening")
+            {
+                opening = true;
+                title = args[++i];
+                subtitle = args[++i];
+            }
+            else if (args[i] == "-b" || args[i] == "--background")
+            {
+                backgroundSeconds = int.Parse(args[++i]);
             }
         }
 
@@ -62,29 +82,54 @@ public static class Program
             output = "output.mp4";
         }
 
-        RenderGitLog(width.Value, height!.Value, fps.Value, "git-log-p-output.txt", maxCommitCount, output);
+        using var ffmpeg = new FfmpegProcess(fps.Value, output);
+        if (opening)
+        {
+            RenderOpening(width.Value, height!.Value, fps.Value, title!, subtitle!, null, ffmpeg);
+        }
+        if (repo != null)
+        {
+            RenderGitLog(width.Value, height!.Value, fps.Value, repo, maxCommitCount, ffmpeg);
+        }
+        if (backgroundSeconds.HasValue)
+        {
+            RenderOpening(width.Value, height!.Value, fps.Value, string.Empty, string.Empty, backgroundSeconds.Value, ffmpeg);
+        }
     }
 
-    static void RenderGitLog(int width, int height, int fps, string repoOrDiffPath, int? maxCommitCount, string videoFilename)
+    static void RenderOpening(int width, int height, int fps, string title, string subtitle, int? background, IOutput output)
     {
-        System.Console.WriteLine($"Rendering git log from {repoOrDiffPath} to {videoFilename} at {width}x{height} at {fps} fps");
-        string fullPath = Path.Combine(Environment.CurrentDirectory, repoOrDiffPath);
-        if (File.Exists(fullPath))
+        using var renderer = new IntroRenderer(output, title, subtitle, fps, width, height);
+        if (background.HasValue)
         {
-            RenderGitLogFromDiff(width, height, fps, fullPath, maxCommitCount, videoFilename);
+            renderer.RenderBackground(TimeSpan.FromSeconds(background.Value));
         }
         else
         {
-            RenderGitLogFromRepo(width, height, fps, fullPath, maxCommitCount, videoFilename);
+            renderer.RenderTimeline();
         }
     }
 
-    private static void RenderGitLogFromRepo(int width, int height, int fps, string fullPath, int? maxCommitCount, string videoFilename)
+    static void RenderGitLog(int width, int height, int fps, string repoOrDiffPath, int? maxCommitCount, IOutput output)
+    {
+        System.Console.WriteLine($"Rendering git log from {repoOrDiffPath}");
+        string fullPath = Path.Combine(Environment.CurrentDirectory, repoOrDiffPath);
+        if (File.Exists(fullPath))
+        {
+            RenderGitLogFromDiff(width, height, fps, fullPath, maxCommitCount, output);
+        }
+        else
+        {
+            RenderGitLogFromRepo(width, height, fps, fullPath, maxCommitCount, output);
+        }
+    }
+
+    private static void RenderGitLogFromRepo(int width, int height, int fps, string fullPath, int? maxCommitCount, IOutput output)
     {
         throw new NotImplementedException();
     }
 
-    private static void RenderGitLogFromDiff(int width, int height, int fps, string fullPath, int? maxCommitCount, string videoFilename)
+    private static void RenderGitLogFromDiff(int width, int height, int fps, string fullPath, int? maxCommitCount, IOutput output)
     {
         string[] lines = File.ReadAllLines(fullPath);
         IEnumerable<Commit> commits = Commit.CreateCommitsFromDiff(lines);
@@ -93,8 +138,7 @@ public static class Program
 
         int titleHeight = height / 20;
         int editorHeight = height - titleHeight;
-        using var ffmpeg = new FfmpegProcess(fps, videoFilename);
-        using var ide = new IdeOutput(width, height, titleHeight, ffmpeg);
+        using var ide = new IdeOutput(width, height, titleHeight, output);
         string currentFilename = string.Empty;
         Coder? coder = null;
 

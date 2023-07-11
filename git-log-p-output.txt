@@ -363,7 +363,7 @@ index 1f77697..0f35ee5 100644
  player.connect(audio.destination);
  
 +// Load song from Enigma by Phenomena
-+// Made by Firefox (Jimmy Fredriksson) and Tip (Robert Ling)
++// Made by Firefox (Jimmy Fredriksson) and Tip (Robert Österbergh)
 +const url = 'https://api.modarchive.org/downloads.php?moduleid=101789';
 +const mod = await loadMod(url);
 +
@@ -1200,7 +1200,7 @@ index 0f35ee5..b33b3ff 100644
  player.connect(audio.destination);
  
  // Load song from Enigma by Phenomena
- // Made by Firefox (Jimmy Fredriksson) and Tip (Robert Ling)
+ // Made by Firefox (Jimmy Fredriksson) and Tip (Robert Österbergh)
  const url = 'https://api.modarchive.org/downloads.php?moduleid=101789';
  const mod = await loadMod(url);
  
@@ -1469,7 +1469,7 @@ index b33b3ff..5b6c71c 100644
  player.connect(audio.destination);
  
  // Load song from Enigma by Phenomena
- // Made by Firefox (Jimmy Fredriksson) and Tip (Robert Ling)
+ // Made by Firefox (Jimmy Fredriksson) and Tip (Robert Österbergh)
  const url = 'https://api.modarchive.org/downloads.php?moduleid=101789';
  const mod = await loadMod(url);
  

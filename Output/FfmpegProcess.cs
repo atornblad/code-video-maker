@@ -12,6 +12,7 @@ class FfmpegProcess : IOutput
     private TimeSpan rendered = TimeSpan.Zero;
     private TimeSpan nextOutput = TimeSpan.FromSeconds(0.0);
     private DateTime? lastOutput = null;
+    private DateTime? firstOutput = null;
     private TimeSpan timePerFrame;
 
     public FfmpegProcess() : this(DEFAULT_FPS, DEFAULT_FPS, DEFAULT_FILENAME) { }
@@ -31,7 +32,7 @@ class FfmpegProcess : IOutput
         Console.WriteLine("Starting ffmpeg...");
         process = new Process();
         process.StartInfo.FileName = @"..\ffmpeg\bin\ffmpeg.exe";
-        process.StartInfo.Arguments = $"-framerate {fpsIn} -f image2pipe -i - -c:v libx264 -r {fpsOut} -pix_fmt yuv420p -v fatal {filename}";
+        process.StartInfo.Arguments = $"-framerate {fpsIn} -f image2pipe -i - -c:v libx264 -qscale 2 -q:v 2 -r {fpsOut} -pix_fmt yuv420p -v fatal {filename}";
         process.StartInfo.WorkingDirectory = System.Environment.CurrentDirectory;
         process.StartInfo.RedirectStandardInput = true;
         process.StartInfo.UseShellExecute = false;
@@ -55,12 +56,19 @@ class FfmpegProcess : IOutput
             lastOutput = now;
             nextOutput += TimeSpan.FromSeconds(10.0);
         }
+        if (firstOutput == null)
+        {
+            firstOutput = DateTime.Now;
+        }
     }
 
     public void Dispose()
     {
         Console.WriteLine("Flushing video frames...");
-        process.StandardInput.Close();
+        Console.WriteLine($"Rendered {rendered.TotalSeconds:0.0} seconds");
+        var now = DateTime.Now;
+        var diff = now - firstOutput!.Value;
+        Console.WriteLine($"Current speed ratio: {rendered.TotalSeconds / diff.TotalSeconds * 100.0:0.0} %");
         process.StandardInput.Dispose();
 
         while (true)
